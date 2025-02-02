@@ -1,0 +1,41 @@
+name: NodeJS with Webpack
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: PluginBuild
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Build
+      env:
+        PLUGIN_ID: ${{ vars.PLUGIN_ID }}
+        NODE_OPTIONS: ${{ vars.NODE_OPTIONS }}
+        GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}    
+      run: |
+        export NODE_OPTIONS=--openssl-legacy-provider
+        npm install -g corepack
+        corepack enable
+        yarn
+        yarn build
+        npx @grafana/sign-plugin@latest
+        cp -r dist "${PLUGIN_ID}"
+        zip -qr "${PLUGIN_ID}.zip" "${PLUGIN_ID}"
+        npx @grafana/plugin-validator@latest -sourceCodeUri file://. "${PLUGIN_ID}.zip"
+        sha1sum ${PLUGIN_ID}.zip
